@@ -235,7 +235,7 @@ initialize(int argc, char *argv[], cl_info_t *info, char *errmsg)
     } */
 
     memset(info, 0, sizeof(cl_info_t));
-    info->sv_ipaddr = "";
+    info->sv_ipaddr = "203.178.143.7";
     info->sv_port   = 2964;
 
     return(0);
