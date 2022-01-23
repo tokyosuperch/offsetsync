@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <time.h>
 #include <stdarg.h>
+#include <sys/select.h>
 
 /*
  *  クライアントの接続先サーバ情報
@@ -60,7 +61,35 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     int recv_msglen = 0;
     unsigned char buff[BUFSIZ];
     int ts_len = sizeof(struct timespec);
+    fd_set readfds;
+    struct timeval timeout;
+    int ret_select;
+    
+    //タイムアウト時間設定
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    
+    /* 読み込みFD集合を空にする */
+    FD_ZERO(&readfds);
 
+    /* 読み込みFD集合にinfo->sdを追加 */
+    FD_SET(info->sd, &readfds);
+    
+    /* selectでreadfdsのどれかが読み込み可能になるまでorタイムアウトまで待ち */
+    ret_select = select(info->sd + 1, &readfds, NULL, NULL, &timeout);
+
+    /* 戻り値をチェック */
+    if (ret_select == -1) {
+        /* select関数がエラー */
+        fprintf(stderr, "Fatal: select error\n");
+        return -1;
+    }
+
+    if (ret_select == 0) {
+        /* 読み込み可能になったFDの数が0なのでタイムアウトと判断 */
+        fprintf(stderr, "Receive Timeout\n");
+        return -1;
+    }
     /* 応答メッセージを受信する */
     recv_addrlen = sizeof(recv_addr);
     recv_msglen = recvfrom(info->sd, buff, BUFSIZ, 0, 
