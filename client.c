@@ -33,7 +33,6 @@ struct timespec recv_ts;
 
 extern int timestamp_stamp(unsigned char *temp, struct timespec *ts_p, int ts_len);
 extern int clock_adjust(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p);
-int loop = 0;
 
 /*!
  * @brief      応答メッセージを受信する
@@ -104,7 +103,6 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     if (ts.tv_sec == receipt_ts.tv_sec && ts.tv_nsec == receipt_ts.tv_nsec) {
         rc = clock_adjust(&ts, &back_ts, &recv_ts);
         if(rc != 0){
-            fprintf(stderr, "Error: %s\n", errmsg);
             return(-1);
         }
         // 送信時刻
@@ -114,11 +112,10 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
         // 現在
         printf("%ld.%09ld\n",recv_ts.tv_sec,recv_ts.tv_nsec);
         // fprintf(stdout, "Received: %s\n", buff);
-    } else {
-        loop--;
+        sleep(1);
     }
 
-    return(0);
+    return(-1);
 }
 
 /*!
@@ -229,7 +226,6 @@ udp_client(cl_info_t *info, char *errmsg)
     while(1) {
         /* メッセージの送受信を行う */
         rc = udp_echo_client(info, errmsg);
-        sleep(1);
     }
 
     /* ソケットの終期化 */
