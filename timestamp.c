@@ -4,7 +4,7 @@
 #include <sys/time.h>
 #include <stdio.h>
 
-#define NANO_TO_MICRO 100
+#define NANO_TO_MICRO 1000
 #define NANO_TO_MILLI 1000000
 #define NANO_TO_SEC 1000000000
 
