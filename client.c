@@ -12,6 +12,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <sys/select.h>
+#include <sys/wait.h>
 
 /*
  *  クライアントの接続先サーバ情報
@@ -31,9 +32,9 @@ struct timespec receipt_ts;
 struct timespec back_ts;
 struct timespec recv_ts;
 
-extern int timestamp_stamp(unsigned char *temp, struct timespec *tp, int ts_len);
-
-int loop = 0;
+extern int timestamp_stamp(unsigned char *temp, struct timespec *ts_p, int ts_len);
+extern int clock_adjust(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p);
+extern int gpioin();
 
 /*!
  * @brief      応答メッセージを受信する
@@ -52,6 +53,7 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     fd_set readfds;
     struct timeval timeout;
     int ret_select;
+    int rc = 0;
     
     //タイムアウト時間設定
     timeout.tv_sec = 1;
@@ -101,15 +103,7 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     
     // 出力
     if (ts.tv_sec == receipt_ts.tv_sec && ts.tv_nsec == receipt_ts.tv_nsec) {
-        // 送信時刻
-        printf("%ld.%09ld,",ts.tv_sec,ts.tv_nsec);
-        // サーバー時刻
-        printf("%ld.%09ld,",back_ts.tv_sec,back_ts.tv_nsec);
-        // 現在
-        printf("%ld.%09ld\n",recv_ts.tv_sec,recv_ts.tv_nsec);
-        // fprintf(stdout, "Received: %s\n", buff);
-    } else {
-        loop--;
+        rc = clock_adjust(&ts, &back_ts, &recv_ts);
     }
 
     return(0);
@@ -220,10 +214,27 @@ udp_client(cl_info_t *info, char *errmsg)
     /* ソケットの初期化 */
     rc = socket_initialize(info, errmsg);
     if(rc != 0) return(-1);
-    for (loop = 0; loop < 100; loop++) {
+    while(1) {
+        pid_t pid = fork();
+	    if (pid < 0) {
+		    perror("fork");
+	    } else if (pid == 0) {
+		    // 子プロセスで別プログラムを実行
+		    execlp("ntpdate", "ntpdate", "-p", "1", "-b", "supachan.sfc.wide.ad.jp", NULL);
+		    perror("ntpdate");
+	    }
+
+	    // 親プロセス
+	    int status;
+	    pid_t r = waitpid(pid, &status, 0); //子プロセスの終了待ち
+	    if (r < 0) {
+		    perror("waitpid");
+	    }
         /* メッセージの送受信を行う */
         rc = udp_echo_client(info, errmsg);
-        sleep(1);
+        if (rc == 0) {
+	        sleep(1);
+        };
     }
 
     /* ソケットの終期化 */
@@ -262,6 +273,7 @@ initialize(int argc, char *argv[], cl_info_t *info, char *errmsg)
 int
 main(int argc, char *argv[])
 {
+    gpioin();
     int rc = 0;
     cl_info_t info = {0};
     char errmsg[BUFSIZ];
