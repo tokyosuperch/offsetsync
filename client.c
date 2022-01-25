@@ -226,7 +226,7 @@ udp_client(cl_info_t *info, char *errmsg)
     /* ソケットの初期化 */
     rc = socket_initialize(info, errmsg);
     if(rc != 0) return(-1);
-    for (loop = 0; loop < 100; loop++) {
+    while(1) {
         /* メッセージの送受信を行う */
         rc = udp_echo_client(info, errmsg);
         sleep(1);
