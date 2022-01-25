@@ -31,8 +31,8 @@ struct timespec receipt_ts;
 struct timespec back_ts;
 struct timespec recv_ts;
 
-extern int timestamp_stamp(unsigned char *temp, struct timespec *tp, int ts_len);
-
+extern int timestamp_stamp(unsigned char *temp, struct timespec *ts_p, int ts_len);
+extern int clock_adjust(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p);
 int loop = 0;
 
 /*!
@@ -52,6 +52,7 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     fd_set readfds;
     struct timeval timeout;
     int ret_select;
+    int rc = 0;
     
     //タイムアウト時間設定
     timeout.tv_sec = 1;
@@ -101,6 +102,11 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     
     // 出力
     if (ts.tv_sec == receipt_ts.tv_sec && ts.tv_nsec == receipt_ts.tv_nsec) {
+        rc = clock_adjust(&ts, &back_ts, &recv_ts);
+        if(rc != 0){
+            fprintf(stderr, "Error: %s\n", errmsg);
+            return(-1);
+        }
         // 送信時刻
         printf("%ld.%09ld,",ts.tv_sec,ts.tv_nsec);
         // サーバー時刻
