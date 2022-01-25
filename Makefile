@@ -1,5 +1,5 @@
 CC=gcc
-CLIENT_OBJS=client.c
+CLIENT_OBJS=client.c timestamp.c
 GPIO_OBJS=gpioout.c
 LIBS=-lpthread -lpigpio
 CLIENT_PROGRAM=client.elf

@@ -31,21 +31,9 @@ struct timespec receipt_ts;
 struct timespec back_ts;
 struct timespec recv_ts;
 
+extern int timestamp_stamp(unsigned char *temp, struct timespec *tp, int ts_len);
+
 int loop = 0;
-
-unsigned long long int charToInt(int bytes, ...) {
-	va_list list;
-	unsigned long long int temp = 0; 
-
-	va_start(list, bytes);
-	for(int i = 0; i < bytes; i++) {
-		temp += va_arg(list, int);
-		if (bytes - i > 1) temp = temp << 8;
-	}
-	va_end(list);
-
-	return temp;
-}
 
 /*!
  * @brief      応答メッセージを受信する
@@ -137,14 +125,11 @@ static int
 udp_send_msg(cl_info_t *info, char *errmsg)
 {
     int rc = 0;
+    unsigned char *temp;
     int ts_len = sizeof(struct timespec);
     int msg_len = ts_len;
-    
-    unsigned char *temp;
     temp = (unsigned char *)malloc(ts_len);
-    clock_gettime(CLOCK_REALTIME, &ts);
-    memcpy(temp, &ts, ts_len);
-
+    timestamp_stamp(temp, &ts, ts_len);
     /* メッセージの送信 */
     rc = sendto(info->sd,
                 temp,
