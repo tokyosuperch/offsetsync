@@ -3,12 +3,24 @@
 #include <string.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <limits.h>
 
 #define NANO_TO_MICRO 1000
 #define NANO_TO_MILLI 1000000
 #define NANO_TO_SEC 1000000000
 
+#define LOOP_MAX 100
+
+struct taggedoffset {
+    struct timespec rtt;
+    struct timespec offset;
+};
+
 const struct timespec fixdata = {0, 5169984};
+struct taggedoffset rtt_min = {
+    {INT_MAX, 999999999},
+    {0,0}
+};
 
 struct timespec timessub(const struct timespec *A, const struct timespec *B)
 {
@@ -77,9 +89,24 @@ struct timespec timediv(const struct timespec *A, long int B)
     C.tv_sec = div;
     C.tv_nsec += mod * NANO_TO_SEC;
     C.tv_nsec /= B;
-    if (C.tv_nsec < 0) {
-        C.tv_nsec += NANO_TO_SEC;
-        C.tv_sec -= 1;
+    if (C.tv_sec <= 0 && C.tv_nsec < 0) {
+        if(C.tv_nsec>0){
+            C.tv_sec++;
+            C.tv_nsec -= NANO_TO_SEC;
+        }
+        if(C.tv_nsec<=NANO_TO_SEC * -1){
+            C.tv_sec--;
+            C.tv_nsec += NANO_TO_SEC;
+        }
+    } else {
+        if(C.tv_nsec<0){
+            C.tv_sec--;
+            C.tv_nsec += NANO_TO_SEC;
+        }
+        if(C.tv_nsec>=NANO_TO_SEC){
+            C.tv_sec++;
+            C.tv_nsec -= NANO_TO_SEC;
+        }
     }
     return C;
 }
@@ -92,17 +119,24 @@ int timestamp_stamp(unsigned char *temp, struct timespec *ts_p, int ts_len) {
     return 0;
 }
 
-int clock_adjust(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p) {
+void rtt_compare(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p) {
     struct timespec alpha = timessub(back_ts_p, ts_p);
     struct timespec beta = timessub(back_ts_p, recv_ts_p);
     struct timespec rtt = timessub(&alpha, &beta);
     struct timespec doubleoffset = timesadd(&alpha, &beta);
     struct timespec offset = timediv(&doubleoffset, 2);
+    struct timespec compare = timessub(&rtt_min.rtt, &rtt);
+    if (compare.tv_sec > 0 || compare.tv_nsec > 0) {
+        rtt_min.rtt = rtt;
+        rtt_min.offset = offset;
+    }
+}
+
+int clock_adjust() {
     struct timespec now;
     struct timespec adj_realtime;
-    struct timespec fixed_offset = timessub(&offset, &fixdata);
+    struct timespec fixed_offset = timessub(&rtt_min.offset, &fixdata);
     clock_gettime(CLOCK_REALTIME, &now);
     adj_realtime = timesadd(&now, &fixed_offset);
     return clock_settime(CLOCK_REALTIME, &adj_realtime);
-    
 }

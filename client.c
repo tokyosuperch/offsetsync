@@ -13,6 +13,8 @@
 #include <stdarg.h>
 #include <sys/select.h>
 
+#define LOOP_MAX 100
+
 /*
  *  クライアントの接続先サーバ情報
  */
@@ -32,7 +34,9 @@ struct timespec back_ts;
 struct timespec recv_ts;
 
 extern int timestamp_stamp(unsigned char *temp, struct timespec *ts_p, int ts_len);
-extern int clock_adjust(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p);
+extern int clock_adjust();
+extern void rtt_compare(struct timespec *ts_p, struct timespec *back_ts_p, struct timespec *recv_ts_p);
+
 
 /*!
  * @brief      応答メッセージを受信する
@@ -101,10 +105,7 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
     
     // 出力
     if (ts.tv_sec == receipt_ts.tv_sec && ts.tv_nsec == receipt_ts.tv_nsec) {
-        rc = clock_adjust(&ts, &back_ts, &recv_ts);
-        if(rc != 0){
-            return(-1);
-        }
+        rtt_compare(&ts, &back_ts, &recv_ts);
         // 送信時刻
         printf("%ld.%09ld,",ts.tv_sec,ts.tv_nsec);
         // サーバー時刻
@@ -112,7 +113,6 @@ udp_receive_msg(cl_info_t *info, char *errmsg)
         // 現在
         printf("%ld.%09ld\n",recv_ts.tv_sec,recv_ts.tv_nsec);
         // fprintf(stdout, "Received: %s\n", buff);
-        sleep(1);
     }
 
     return(-1);
@@ -223,10 +223,12 @@ udp_client(cl_info_t *info, char *errmsg)
     /* ソケットの初期化 */
     rc = socket_initialize(info, errmsg);
     if(rc != 0) return(-1);
-    while(1) {
+    for (int i = 0; i < LOOP_MAX; i++) {
         /* メッセージの送受信を行う */
         rc = udp_echo_client(info, errmsg);
     }
+    rc = clock_adjust();
+    if(rc != 0) return(-1);
 
     /* ソケットの終期化 */
     socket_finalize(info);
